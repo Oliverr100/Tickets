@@ -1,0 +1,36 @@
+figure out ACF https://www.spigotmc.org/threads/acf-beta-annotation-command-framework.234266/#post-2366730
+
+figure out mongodb
+
+custom object serialization / deserialization https://futurestud.io/tutorials/gson-advanced-custom-serialization-part-1 DONE i think
+
+Command scheme
+
+/ticket
+	help [create, delete, info}
+	info (ticket name)
+	create (name) ->
+
+GUI
+
+Main Page
+
+	View Tickets  ->   hover - shows ticket info, shift right click -> delete with confirmation in chat   shift left to flip between normal/ high prio left click to finish
+	Create Ticket ->   /ticket create (name) -
+	View High Priority ->
+	View Finished ->
+
+Choose Category
+	TODO Colored wool? different categories
+
+    TODO differnet categores mean different ticket items
+
+Categories:
+
+
+
+mongo info
+pw: QzWxEcRv
+
+
+
