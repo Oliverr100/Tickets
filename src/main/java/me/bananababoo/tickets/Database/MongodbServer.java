@@ -52,13 +52,15 @@ public class MongodbServer {
             Bukkit.getLogger().info(json);
             Document doc = Document.parse(json);
             Bson filter = eq(ticket._ID());
+            Bson filter2 = Filters.all("id", ticket.ID());
             Bukkit.getLogger().info((col.find().toString()));
             Bukkit.getLogger().info("2");
-            if (col.findOneAndReplace(filter, doc) != null) {    // if a ticket already exists with the same id, overwrite ticket with new data
+            if (col.findOneAndReplace(Filters.or(filter,filter2), doc) != null) {    // if a ticket already exists with the same id, overwrite ticket with new data
                 Bukkit.getLogger().info(doc + "\n Got Updated to DB ");
+            }else{
+                col.insertOne(doc);   //else save it in a new doc
+                Bukkit.getLogger().info(ticket + "\n Got Updated to DB ");
             }
-            col.insertOne(doc);   //else save it in a new doc
-            Bukkit.getLogger().info(ticket + "\n Got Saved to DB ");
         });
     }
 
@@ -84,7 +86,6 @@ public class MongodbServer {
                 // call the callback with the Tickets
                 callback.onQueryFinished(docs);
             });
-
         });
     }
 

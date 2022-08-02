@@ -2,22 +2,27 @@ package me.bananababoo.tickets.GUI;
 
 import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
-import com.github.stefvanschie.inventoryframework.pane.*;
+import com.github.stefvanschie.inventoryframework.pane.OutlinePane;
+import com.github.stefvanschie.inventoryframework.pane.PaginatedPane;
+import com.github.stefvanschie.inventoryframework.pane.PatternPane;
 import com.github.stefvanschie.inventoryframework.pane.util.Pattern;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Sorts;
-import me.bananababoo.tickets.TicketStuff.Category;
 import me.bananababoo.tickets.Commands.TicketCommand;
 import me.bananababoo.tickets.Database.MongodbServer;
+import me.bananababoo.tickets.TicketStuff.Category;
+import me.bananababoo.tickets.TicketStuff.Status;
 import me.bananababoo.tickets.TicketStuff.Ticket;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bson.Document;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -25,7 +30,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 public class GUIManager {
@@ -48,7 +52,10 @@ public class GUIManager {
         GuiItem makeNewTicketItem = generateItem("Make New Ticket", Material.WRITABLE_BOOK);
         GuiItem openFinishedTicketsWindowItem = generateItem("View Finished Tickets", Material.WRITABLE_BOOK);
         openTicketWindowItem.setAction(event -> openTicketWindow(p));
-        makeNewTicketItem.setAction(event -> TicketCommand.create(p));
+        makeNewTicketItem.setAction(event -> {
+            TicketCommand.create(p);
+            p.closeInventory();
+        });
         openFinishedTicketsWindowItem.setAction(event -> openFinishedTicketWindow());
         pane.bindItem('0', makeNewTicketItem);
         pane.bindItem('1', backgroundItem);
@@ -99,24 +106,28 @@ public class GUIManager {
             try {
                 amount = docs.sort(Sorts.descending("id")).first().getInteger("id");
             } catch(Exception ignored){
-            }
+        }
 
             docs = docs.sort(Sorts.ascending("id"));
             for(int i = -1; i < (amount / 45); i++){  // make enough pages
                     OutlinePane pane = new OutlinePane(0, 0, 9, 5);
                     docs.skip((i+1) * 45).limit(45).forEach((Consumer<Document>) document -> {
-                        p.sendMessage(document.toString());
                         Ticket ticket = new Gson().fromJson(document.toJson(), Ticket.class);
                         ItemStack item = new ItemStack(ticket.category().mat);
                         ItemMeta meta = item.getItemMeta();
-                        meta.displayName(Component.text(ticket.toString()).color(NamedTextColor.GOLD));
+                        if(ticket.status().equals(Status.HIGH_PRIORITY)){
+                            meta.displayName(Component.text(ticket + " (High Priority)").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
+                            meta.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+                            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                        }else {
+                            meta.displayName(Component.text(ticket.toString()).color(NamedTextColor.GOLD));
+                        }
 
                         List<Component> list = new ArrayList<>();
                         list.add(Component.text(ticket.description()).color(NamedTextColor.WHITE));
                         list.add(Component.empty());
                         list.add(Component.text("Category: " + ticket.category().toString()).color(NamedTextColor.GRAY));
                         list.add(Component.text(s.format(ticket.DateCreated()) + " " + ticket.playerName()).color(NamedTextColor.GRAY));
-
                         meta.lore(list);
                         item.setItemMeta(meta);
                         GuiItem guiItem  = new GuiItem(item);
@@ -126,7 +137,29 @@ public class GUIManager {
                                 p.sendMessage(Component.text("Removed ticket " + ticket.name()).color(NamedTextColor.RED));
                                 int page = paginatedPane.getPage();
                                 openTicketWindow(p);
-                                paginatedPane.setPage(page);
+                                try{
+                                    if(paginatedPane.getPages() > 0) {
+                                        paginatedPane.setPage(page);
+                                    }
+                                    gui.update();
+                                } catch (ArrayIndexOutOfBoundsException ignored) {}
+                            } else if (event.isRightClick()){
+                                if(ticket.status() != Status.HIGH_PRIORITY) {
+                                    ticket.setStatus(Status.HIGH_PRIORITY);
+                                } else {
+                                    ticket.setStatus(Status.NORMAL);
+                                }
+                                MongodbServer.saveTicketAsync(ticket);
+                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as High Priorty").color(NamedTextColor.RED));
+                                int page = paginatedPane.getPage();
+                                p.sendMessage(page + "");
+                                openTicketWindow(p);
+                                try{
+                                    if(paginatedPane.getPages() > 0) {
+                                        paginatedPane.setPage(page);
+                                    }
+                                    gui.update();
+                                } catch (ArrayIndexOutOfBoundsException ignored) {}
                                 gui.update();
                             }
                         });
@@ -159,6 +192,8 @@ public class GUIManager {
         GuiItem lore = generateItem("Lore", Category.LORE.mat);
         GuiItem playTesting = generateItem("Play Testing", Category.PLAY_TESTING.mat);
         GuiItem technical = generateItem("nerd stuff", Category.TECHNICAL.mat);
+
+        //TODO give category a type for name
 
         building.setAction(event -> {
             MongodbServer.saveTicketAsync(new Ticket(p.getName(), Category.BUILDING, name, description));

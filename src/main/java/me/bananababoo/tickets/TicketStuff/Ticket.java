@@ -10,7 +10,7 @@ public class Ticket {
     private final ObjectId _id;
     private final String playername;
     private final Integer id;
-    private Category category;
+    private final Category category;
     private Status status;
     private String description;
     private String name;
@@ -22,7 +22,7 @@ public class Ticket {
         this.category = category;
         this.description = description;
         this.name = name;
-        this.status = Status.UNFINISHED;
+        this.status = Status.NORMAL;
         this.id = MongodbServer.getCurrentId();
     }
     public String toString(){
@@ -63,9 +63,9 @@ public class Ticket {
 
     public ObjectId _ID(){
         return this._id;
-    };
+    }
     public Integer ID(){
         return this.id;
-    };
+    }
 
 }
