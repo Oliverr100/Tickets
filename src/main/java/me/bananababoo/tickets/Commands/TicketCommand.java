@@ -4,7 +4,6 @@ import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Subcommand;
-import io.papermc.paper.event.player.AsyncChatEvent;
 import me.bananababoo.tickets.Commands.Prompts.NamePrompt;
 import me.bananababoo.tickets.GUI.GUIManager;
 import me.bananababoo.tickets.Tickets;
@@ -13,18 +12,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.conversations.Conversation;
 import org.bukkit.conversations.ConversationFactory;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
 @CommandAlias("ticket|tk")
 public class TicketCommand extends BaseCommand implements Listener {
 
-    boolean listeningForChatInput = false;
     Component chatInput;
 
-    public void setListeningForDescription(boolean listeningForDescription) {
-        this.listeningForChatInput = listeningForDescription;
-    }
 
     @Default
     public void onDefault(Player player) {
@@ -39,15 +33,6 @@ public class TicketCommand extends BaseCommand implements Listener {
         c.begin();
     }
 
-
-
-    @EventHandler
-    public void onPlayerPseak(AsyncChatEvent e) {
-        if (listeningForChatInput) {
-            chatInput = e.message();
-
-        }
-    }
 
 }
 

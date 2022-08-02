@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.mongodb.*;
 import com.mongodb.client.*;
 import com.mongodb.client.MongoClient;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import me.bananababoo.tickets.TicketStuff.Ticket;
 import me.bananababoo.tickets.Tickets;
@@ -45,7 +46,6 @@ public class MongodbServer {
     }
 
     public static void saveTicketAsync(Ticket ticket){
-        Bukkit.getLogger().info("1");
         Bukkit.getScheduler().runTaskAsynchronously(Tickets.getPlugin(), () -> {
             Gson gson = new Gson();
             String json = gson.toJson(ticket);
@@ -55,10 +55,24 @@ public class MongodbServer {
             Bukkit.getLogger().info((col.find().toString()));
             Bukkit.getLogger().info("2");
             if (col.findOneAndReplace(filter, doc) != null) {    // if a ticket already exists with the same id, overwrite ticket with new data
-                Bukkit.getLogger().info(doc + "\n Got Saved to DB ");
+                Bukkit.getLogger().info(doc + "\n Got Updated to DB ");
             }
             col.insertOne(doc);   //else save it in a new doc
             Bukkit.getLogger().info(ticket + "\n Got Saved to DB ");
+        });
+    }
+
+    public static void removeTicketAsync(Ticket ticket){
+        Bukkit.getScheduler().runTaskAsynchronously(Tickets.getPlugin(), () -> {
+            Bson filter = eq(ticket._ID());
+            Bson filter2 = Filters.all("id", ticket.ID());
+            Bukkit.getLogger().info((col.find().toString()));
+            Bukkit.getLogger().info("2");
+            if (col.findOneAndDelete(Filters.or(filter,filter2)) != null) {    // if a ticket exists with the id remove it
+                Bukkit.getLogger().info(ticket.name() + "\n Ticket Got Removed from DB ");
+            }else {
+                Bukkit.getLogger().info(ticket.name() + "\n Ticket Didn't get removed as it dosn't exist");
+            }
         });
     }
 
