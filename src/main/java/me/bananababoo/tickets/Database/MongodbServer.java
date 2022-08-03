@@ -24,8 +24,7 @@ public class MongodbServer {
     public static void connect(){
 
         MongoCredential credential = MongoCredential.createCredential("Banana","ba6lhd4vitblpfq", "Baboo".toCharArray()).withMechanism(AuthenticationMechanism.SCRAM_SHA_1);
-        ConnectionString connectionString = new ConnectionString("mongodb://n1-c2-mongodb-clevercloud-customers.services.clever-cloud.com:27017");
-
+        ConnectionString connectionString = new ConnectionString("mongodb://n2-c2-mongodb-clevercloud-customers.services.clever-cloud.com:27017");
 
         MongoClientSettings settings = MongoClientSettings.builder()
                 .credential(credential)
@@ -39,10 +38,6 @@ public class MongodbServer {
         currentid = getLastId();
 
         Bukkit.getLogger().info("Connected to MongoDB");
-    }
-
-    public static MongoCollection<Document> getCollection(){
-        return col;
     }
 
     public static void saveTicketAsync(Ticket ticket){
@@ -90,7 +85,6 @@ public class MongodbServer {
     }
 
     public static Integer getLastId(){
-        Document d = new Document("_id", "");
         Integer result = 0;
         try {
             result = col.find().sort(Sorts.descending("id")).first().getInteger("id");

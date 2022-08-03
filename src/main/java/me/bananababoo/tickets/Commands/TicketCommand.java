@@ -7,7 +7,6 @@ import co.aikar.commands.annotation.Subcommand;
 import me.bananababoo.tickets.Commands.Prompts.NamePrompt;
 import me.bananababoo.tickets.GUI.GUIManager;
 import me.bananababoo.tickets.Tickets;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.conversations.Conversation;
 import org.bukkit.conversations.ConversationFactory;
@@ -16,8 +15,6 @@ import org.bukkit.event.Listener;
 
 @CommandAlias("ticket|tk")
 public class TicketCommand extends BaseCommand implements Listener {
-
-    Component chatInput;
 
 
     @Default
