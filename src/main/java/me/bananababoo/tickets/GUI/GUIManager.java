@@ -2,11 +2,13 @@ package me.bananababoo.tickets.GUI;
 
 import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
+import com.github.stefvanschie.inventoryframework.gui.type.util.Gui;
 import com.github.stefvanschie.inventoryframework.pane.OutlinePane;
 import com.github.stefvanschie.inventoryframework.pane.PaginatedPane;
 import com.github.stefvanschie.inventoryframework.pane.PatternPane;
 import com.github.stefvanschie.inventoryframework.pane.util.Pattern;
 import com.google.gson.Gson;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import me.bananababoo.tickets.Commands.TicketCommand;
 import me.bananababoo.tickets.Database.MongodbServer;
@@ -18,7 +20,6 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -32,13 +33,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import static com.mongodb.client.model.Filters.*;
 
 public class GUIManager {
 
     public static final GuiItem backgroundItem = generateItem("", Material.GRAY_STAINED_GLASS_PANE);
 
     public static PaginatedPane paginatedPane;
-    public static GuiItem lastguiItem;
 
     public static void openGUI(Player p) {          //opens main gui panel
         ChestGui gui = new ChestGui(3, "Tickets");
@@ -51,13 +52,13 @@ public class GUIManager {
         PatternPane pane = new PatternPane(0, 0, 9, 3, pattern);
         GuiItem openTicketWindowItem = generateItem("View Open Tickets", Material.PAPER);
         GuiItem makeNewTicketItem = generateItem("Make New Ticket", Material.WRITABLE_BOOK);
-        GuiItem openFinishedTicketsWindowItem = generateItem("View Finished Tickets", Material.WRITABLE_BOOK);
+        GuiItem openFinishedTicketsWindowItem = generateItem("View Finished Tickets", Material.BOOKSHELF);
         openTicketWindowItem.setAction(event -> openTicketWindow(p, SortType.NORMAL));
         makeNewTicketItem.setAction(event -> {
             TicketCommand.create(p);
             p.closeInventory();
         });
-        openFinishedTicketsWindowItem.setAction(event -> openFinishedTicketWindow());
+        openFinishedTicketsWindowItem.setAction(event -> openTicketWindow(p, SortType.FINISHED));
         pane.bindItem('0', makeNewTicketItem);
         pane.bindItem('1', backgroundItem);
         pane.bindItem('2', openTicketWindowItem);
@@ -66,49 +67,12 @@ public class GUIManager {
         gui.show(p);
     }
 
-    public static void openTicketWindow(Player p, SortType sort){              //opens the tickets gui window and grabs all tickets from database and loads them in
+    public static void openTicketWindow(Player p, SortType sort){
+        //opens the tickets gui window and grabs all tickets from database and loads them in
         ChestGui gui = new ChestGui(6, "Tickets");
+        PatternPane patternPane = getBottemPane(gui, p, false);
+
         gui.setOnGlobalClick(event -> event.setCancelled(true));
-        Pattern pattern = new Pattern(
-                "310567024"
-        );
-        paginatedPane = new PaginatedPane(0, 0, 9, 5);
-        PatternPane patternPane = new PatternPane(0,5,9,1, pattern);
-        GuiItem previousPage = generateItem("Previous Page", Material.PAPER);
-        GuiItem nextPage = generateItem("Next Page", Material.PAPER);
-        GuiItem goBack = generateItem("Go Back", Material.BARRIER);
-        GuiItem controls = generateItem("Controls", Material.BOOK, List.of(
-                Component.text("Remove Ticket: Shift Right Click"),
-                Component.text("Toggle Ticket as High Priority: Right Click"),
-                Component.text("Finish Ticket: Shift Left Click")
-                ));
-        GuiItem sortNewest = generateItem("Sort: Newest First", Material.GRASS_BLOCK);
-        GuiItem sortOldest = generateItem("Sort: Oldest", Material.DIRT);
-        GuiItem sortPriorty = generateItem("Sort: Priorty", Material.GOLD_BLOCK);
-        previousPage.setAction(event -> {
-            try {
-                paginatedPane.setPage(paginatedPane.getPage() - 1);
-                gui.update();
-            } catch (ArrayIndexOutOfBoundsException ignored) {}
-        });
-        nextPage.setAction(event -> {
-            try{
-            paginatedPane.setPage(paginatedPane.getPage() + 1);
-            gui.update();
-            } catch (ArrayIndexOutOfBoundsException ignored) {}
-        });
-        goBack.setAction(event -> openGUI(p));
-        sortNewest.setAction(event -> openTicketWindow(p, SortType.TIME_LATEST));
-        sortOldest.setAction(event -> openTicketWindow(p, SortType.TIME_OLDEST));
-        sortPriorty.setAction(event -> openTicketWindow(p, SortType.PRIORITY));
-        patternPane.bindItem('0', backgroundItem);
-        patternPane.bindItem('1', previousPage);
-        patternPane.bindItem('2', nextPage);
-        patternPane.bindItem('3', goBack);
-        patternPane.bindItem('4', controls);
-        patternPane.bindItem('5', sortNewest);
-        patternPane.bindItem('6', sortOldest);
-        patternPane.bindItem('7', sortPriorty);
 
 
         MongodbServer.findTicketsAsync(docs -> {                //gets all documents in database, translates them into items, and puts into lists of 45 per page.
@@ -117,13 +81,14 @@ public class GUIManager {
             try {
                 amount = docs.sort(Sorts.descending("id")).first().getInteger("id");
             } catch(Exception ignored){
-                }
+
+            }
             switch(sort){
-                case TIME_LATEST: docs = docs.sort(Sorts.descending("_id")); break;
-                case TIME_OLDEST: docs = docs.sort(Sorts.ascending("_id")); break;
-                case PRIORITY: docs = docs.filter(new Document("status", "HIGH_PRIORITY")).sort(Sorts.ascending("id")); break;
+                case TIME_LATEST: docs = docs.sort(Sorts.descending("_id")).filter(ne("status", "FINISHED")); break;
+                case TIME_OLDEST: docs = docs.sort(Sorts.ascending("_id")).filter(ne("status", "FINISHED")); break;
+                case PRIORITY: docs = docs.filter(new Document("status", "HIGH_PRIORITY")); break;
                 case FINISHED: docs = docs.filter(new Document("status", "FINISHED")).sort(Sorts.ascending("id")); break;
-                default: docs = docs.sort(Sorts.ascending("id")); break;
+                default: docs = docs.sort(Sorts.ascending("id")).filter(ne("status", "FINISHED")); break;
             }
             for(int i = -1; i < (amount / 45); i++){  // make enough pages
                 OutlinePane pane = new OutlinePane(0, 0, 9, 5);
@@ -131,7 +96,7 @@ public class GUIManager {
                     Ticket ticket = new Gson().fromJson(document.toJson(), Ticket.class);
                     ItemStack item = new ItemStack(ticket.category().mat);
                     ItemMeta meta = item.getItemMeta();
-                    if(ticket.status().equals(Status.HIGH_PRIORITY)){
+                    if(ticket.status().equals(Status.HIGH_PRIORITY)){    //make a new item and if its high priority add enchants
                         meta.displayName(Component.text(ticket + " (High Priority)").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
                         meta.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
                         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
@@ -148,48 +113,67 @@ public class GUIManager {
                     item.setItemMeta(meta);
                     GuiItem guiItem  = new GuiItem(item);
                     guiItem.setAction(event -> {
-                    if(event.isShiftClick() && event.isRightClick()){
-                        MongodbServer.removeTicketAsync(ticket);
-                        p.sendMessage(Component.text("Removed ticket " + ticket.name()).color(NamedTextColor.RED));
-                        int page = paginatedPane.getPage();
-                        openTicketWindow(p, SortType.NORMAL);
-                            try{
-                                if(paginatedPane.getPages() > 0) {
-                                    paginatedPane.setPage(page);
-                                    }
-                                    gui.update();
-                                } catch (ArrayIndexOutOfBoundsException ignored) {}
-                            } else if (event.isRightClick()){
-                                if(ticket.status() != Status.HIGH_PRIORITY) {
-                                    ticket.setStatus(Status.HIGH_PRIORITY);
-                                } else {
-                                    ticket.setStatus(Status.NORMAL);
-                                }
-                                MongodbServer.saveTicketAsync(ticket);
-                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as High Priorty").color(NamedTextColor.GOLD));
-                                int page = paginatedPane.getPage();
-                                openTicketWindow(p, SortType.NORMAL);
+                         if(event.isShiftClick() && event.isRightClick()){ //if shift right click remove ticket and reset window while keeping same page
+                            MongodbServer.removeTicketAsync(ticket);
+                            p.sendMessage(Component.text("Removed ticket: " + ticket.name()).color(NamedTextColor.RED));
+                            int page = paginatedPane.getPage();
+                            openTicketWindow(p, SortType.NORMAL);
                                 try{
                                     if(paginatedPane.getPages() > 0) {
                                         paginatedPane.setPage(page);
-                                    }
-                                    gui.update();
-                                } catch (ArrayIndexOutOfBoundsException ignored) {}
-                                gui.update();
+                                        }
+                                        gui.update();
+                                    } catch (ArrayIndexOutOfBoundsException ignored) {}
+                        } else if (event.isRightClick() && !sort.equals(SortType.FINISHED)){
+                            if(ticket.status() != Status.HIGH_PRIORITY) {
+                                ticket.setStatus(Status.HIGH_PRIORITY);
+                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as High Priorty").color(NamedTextColor.GOLD));
+                            } else {
+                                ticket.setStatus(Status.NORMAL);
+                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as Normal Priorty").color(NamedTextColor.GOLD));
                             }
+                            MongodbServer.saveTicketAsync(ticket);
+                            int page = paginatedPane.getPage();
+                            openTicketWindow(p, SortType.NORMAL);
+                            try{
+                                if(paginatedPane.getPages() > 0) {
+                                    paginatedPane.setPage(page);
+                                }
+                                gui.update();
+                            } catch (ArrayIndexOutOfBoundsException ignored) {}
+                            gui.update();
+                        } else if(event.isShiftClick() && event.isLeftClick()){
+                             if(ticket.status() != Status.FINISHED) {
+                                 ticket.setStatus(Status.FINISHED);
+                             } else {
+                                 ticket.setStatus(Status.NORMAL);
+                             }
+                             MongodbServer.saveTicketAsync(ticket);
+                             Bukkit.getServer().broadcast(Component.text(p.getName() + " Finished ticket: " + ticket.name()).color(TextColor.color(95, 199, 121)));
+                             int page = paginatedPane.getPage();
+                             openTicketWindow(p, SortType.NORMAL);
+                             try{
+                                 if(paginatedPane.getPages() > 0) {
+                                     paginatedPane.setPage(page);
+                                 }
+                                 gui.update();
+                             } catch (ArrayIndexOutOfBoundsException ignored) {}
+                         }
                         });
                         pane.addItem(guiItem);
-                        Bukkit.getLogger().info(item.toString());
                     });
                 paginatedPane.addPane(i+2, pane);
-                Bukkit.getLogger().info(Arrays.toString(paginatedPane.getPanes().toArray()) +  " itterator");
             }
             gui.addPane(paginatedPane);
-            //gui.addPane(pane);
-            gui.addPane(patternPane);
-            paginatedPane.setPage(1);
+            if(sort.equals(SortType.FINISHED)) {
+                paginatedPane.setPage(1);
+                gui.setTitle("Finished Tickets");
+                gui.addPane(getBottemPane(gui, p, true));
+            }else {
+                paginatedPane.setPage(1);
+                gui.addPane(patternPane);
+            }
             gui.show(p);
-            Bukkit.getLogger().info("test");
         });
     }
 
@@ -243,8 +227,61 @@ public class GUIManager {
     }
 
 
-    public static void openFinishedTicketWindow(){
+    public static PatternPane getBottemPane(Gui gui, Player p, boolean finished) {
+        Pattern pattern;
+        if (!finished) {
+            pattern = new Pattern(
+                    "310567024"
+            );
+        } else {
+            pattern = new Pattern(
+                    "310000024"
+            );
+        }
 
+        paginatedPane = new PaginatedPane(0, 0, 9, 5);
+        PatternPane patternPane = new PatternPane(0,5,9,1, pattern);
+        GuiItem previousPage = generateItem("Previous Page", Material.PAPER);
+        GuiItem nextPage = generateItem("Next Page", Material.PAPER);
+        GuiItem goBack = generateItem("Go Back", Material.BARRIER);
+        GuiItem controls;
+        if(finished){
+            controls = generateItem("Controls", Material.BOOK, List.of(Component.text("Set Ticket as Normal: Shift Left Click")));
+        }else {
+            controls = generateItem("Controls", Material.BOOK, List.of(
+                    Component.text("Remove Ticket: Shift Right Click"),
+                    Component.text("Toggle Ticket as High Priority: Right Click"),
+                    Component.text("Toggle Ticket as Finished: Shift Left Click")
+            ));
+        }
+        GuiItem sortNewest = generateItem("Sort: Newest First", Material.GRASS_BLOCK);
+        GuiItem sortOldest = generateItem("Sort: Oldest", Material.DIRT);
+        GuiItem sortPriorty = generateItem("Sort: Priorty", Material.GOLD_BLOCK);
+        previousPage.setAction(event -> {
+            try {
+                paginatedPane.setPage(paginatedPane.getPage() - 1);
+                gui.update();
+            } catch (ArrayIndexOutOfBoundsException ignored) {}
+        });
+        nextPage.setAction(event -> {
+            try{
+                paginatedPane.setPage(paginatedPane.getPage() + 1);
+                gui.update();
+            } catch (ArrayIndexOutOfBoundsException ignored) {}
+        });
+        goBack.setAction(event -> openGUI(p));
+        sortNewest.setAction(event -> openTicketWindow(p, SortType.TIME_LATEST));
+        sortOldest.setAction(event -> openTicketWindow(p, SortType.TIME_OLDEST));
+        sortPriorty.setAction(event -> openTicketWindow(p, SortType.PRIORITY));
+        patternPane.bindItem('0', backgroundItem);
+        patternPane.bindItem('1', previousPage);
+        patternPane.bindItem('2', nextPage);
+        patternPane.bindItem('3', goBack);
+        patternPane.bindItem('4', controls);
+        patternPane.bindItem('5', sortNewest);
+        patternPane.bindItem('6', sortOldest);
+        patternPane.bindItem('7', sortPriorty);
+        return patternPane;
     }
 
 

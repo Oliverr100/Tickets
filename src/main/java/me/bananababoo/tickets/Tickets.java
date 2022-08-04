@@ -3,6 +3,9 @@ package me.bananababoo.tickets;
 import co.aikar.commands.PaperCommandManager;
 import me.bananababoo.tickets.Commands.TicketCommand;
 import me.bananababoo.tickets.Database.MongodbServer;
+import me.bananababoo.tickets.TicketStuff.Category;
+import me.bananababoo.tickets.TicketStuff.Ticket;
+import org.bukkit.Bukkit;
 import org.bukkit.conversations.ConversationFactory;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -22,14 +25,13 @@ public final class Tickets extends JavaPlugin {
         conversation = new ConversationFactory(this)
                 .withModality(true);
 
-//        for (int i = 0; i < 50; i++) {
-//            Bukkit.getScheduler().runTaskLater(this, () -> {
-//                Ticket t = new Ticket("Bananababoo", Category.BUILDING, "name" , "description");
-//                Bukkit.getLogger().info("0");
+//        Bukkit.getScheduler().runTaskLater(this, () -> {
+//            if(MongodbServer.getNumOfDocs() == 0) {
+//                Ticket t = new Ticket("Bananababoo", Category.BUILDING, "name", "description");
+//                Bukkit.getLogger().info("Creating Demo Ticket");
 //                MongodbServer.saveTicketAsync(t);
-//
-//            }, 100 + (i + 15));
-//        }
+//            }
+//        }, 100);
     }
 
     @Override

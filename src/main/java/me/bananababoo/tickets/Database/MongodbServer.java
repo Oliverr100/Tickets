@@ -1,9 +1,11 @@
 package me.bananababoo.tickets.Database;
 
 import com.google.gson.Gson;
-import com.mongodb.*;
+import com.mongodb.AuthenticationMechanism;
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoCredential;
 import com.mongodb.client.*;
-import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import me.bananababoo.tickets.TicketStuff.Ticket;
@@ -12,7 +14,9 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bukkit.Bukkit;
 
-import static com.mongodb.client.model.Filters.eq;
+import java.util.function.Consumer;
+
+import static com.mongodb.client.model.Filters.*;
 
 
 public class MongodbServer {
@@ -42,17 +46,8 @@ public class MongodbServer {
 
     public static void saveTicketAsync(Ticket ticket){
         Bukkit.getScheduler().runTaskAsynchronously(Tickets.getPlugin(), () -> {
-            Gson gson = new Gson();
-            String json = gson.toJson(ticket);
-            Bukkit.getLogger().info(json);
-            Document doc = Document.parse(json);
-            Bson filter = eq(ticket._ID());
-            Bson filter2 = Filters.all("id", ticket.ID());
-            Bukkit.getLogger().info((col.find().toString()));
-            Bukkit.getLogger().info("2");
-            if (col.findOneAndReplace(Filters.or(filter,filter2), doc) != null) {    // if a ticket already exists with the same id, overwrite ticket with new data
-                Bukkit.getLogger().info(doc + "\n Got Updated to DB ");
-            }else{
+            Document doc = Document.parse(new Gson().toJson(ticket)); // turn the ticket into json and parse it
+            if (col.findOneAndReplace(or(eq(ticket._ID()), all("id", ticket.ID())), doc) == null) {    // if a ticket already exists with the same id, overwrite ticket with new data
                 col.insertOne(doc);   //else save it in a new doc
                 Bukkit.getLogger().info(ticket + "\n Got Updated to DB ");
             }
@@ -65,7 +60,7 @@ public class MongodbServer {
             Bson filter2 = Filters.all("id", ticket.ID());
             Bukkit.getLogger().info((col.find().toString()));
             Bukkit.getLogger().info("2");
-            if (col.findOneAndDelete(Filters.or(filter,filter2)) != null) {    // if a ticket exists with the id remove it
+            if (col.findOneAndDelete(or(filter,filter2)) != null) {    // if a ticket exists with the id remove it
                 Bukkit.getLogger().info(ticket.name() + "\n Ticket Got Removed from DB ");
             }else {
                 Bukkit.getLogger().info(ticket.name() + "\n Ticket Didn't get removed as it dosn't exist");
@@ -88,7 +83,6 @@ public class MongodbServer {
         Integer result = 0;
         try {
             result = col.find().sort(Sorts.descending("id")).first().getInteger("id");
-            Bukkit.getLogger().info(result.toString() + "result");
         } catch (Exception e) {
             Bukkit.getLogger().info("1st Ticket stored");
             Bukkit.getLogger().warning(e.getMessage());
@@ -98,6 +92,9 @@ public class MongodbServer {
     public static Integer getCurrentId(){
         currentid += 1;
         return currentid;
+    }
+    public static long getNumOfDocs(){
+        return col.countDocuments();
     }
 
 }
