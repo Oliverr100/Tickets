@@ -3,9 +3,6 @@ package me.bananababoo.tickets;
 import co.aikar.commands.PaperCommandManager;
 import me.bananababoo.tickets.Commands.TicketCommand;
 import me.bananababoo.tickets.Database.MongodbServer;
-import me.bananababoo.tickets.TicketStuff.Category;
-import me.bananababoo.tickets.TicketStuff.Ticket;
-import org.bukkit.Bukkit;
 import org.bukkit.conversations.ConversationFactory;
 import org.bukkit.plugin.java.JavaPlugin;
 

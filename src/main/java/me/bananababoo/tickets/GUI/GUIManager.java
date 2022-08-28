@@ -8,13 +8,14 @@ import com.github.stefvanschie.inventoryframework.pane.PaginatedPane;
 import com.github.stefvanschie.inventoryframework.pane.PatternPane;
 import com.github.stefvanschie.inventoryframework.pane.util.Pattern;
 import com.google.gson.Gson;
-import com.mongodb.client.model.Filters;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.model.Sorts;
 import me.bananababoo.tickets.Commands.TicketCommand;
 import me.bananababoo.tickets.Database.MongodbServer;
 import me.bananababoo.tickets.TicketStuff.Category;
 import me.bananababoo.tickets.TicketStuff.Status;
 import me.bananababoo.tickets.TicketStuff.Ticket;
+import me.bananababoo.tickets.Tickets;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -30,10 +31,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
-import static com.mongodb.client.model.Filters.*;
+
+import static com.mongodb.client.model.Filters.ne;
 
 public class GUIManager {
 
@@ -67,114 +68,122 @@ public class GUIManager {
         gui.show(p);
     }
 
-    public static void openTicketWindow(Player p, SortType sort){
-        //opens the tickets gui window and grabs all tickets from database and loads them in
-        ChestGui gui = new ChestGui(6, "Tickets");
-        PatternPane patternPane = getBottemPane(gui, p, false);
-
-        gui.setOnGlobalClick(event -> event.setCancelled(true));
+    public static void openTicketWindow(Player p, SortType sort) {
+        Bukkit.getScheduler().runTaskLater(Tickets.getPlugin(), () -> {
 
 
-        MongodbServer.findTicketsAsync(docs -> {                //gets all documents in database, translates them into items, and puts into lists of 45 per page.
-            SimpleDateFormat s = new SimpleDateFormat("MM-dd-yyyy");
-            int amount = 0;
-            try {
-                amount = docs.sort(Sorts.descending("id")).first().getInteger("id");
-            } catch(Exception ignored){
+            //opens the tickets gui window and grabs all tickets from database and loads them in
+            ChestGui gui = new ChestGui(6, "Tickets");
+            PatternPane patternPane = getBottemPane(gui, p, false);
 
-            }
-            switch(sort){
-                case TIME_LATEST: docs = docs.sort(Sorts.descending("_id")).filter(ne("status", "FINISHED")); break;
-                case TIME_OLDEST: docs = docs.sort(Sorts.ascending("_id")).filter(ne("status", "FINISHED")); break;
-                case PRIORITY: docs = docs.filter(new Document("status", "HIGH_PRIORITY")); break;
-                case FINISHED: docs = docs.filter(new Document("status", "FINISHED")).sort(Sorts.ascending("id")); break;
-                default: docs = docs.sort(Sorts.ascending("id")).filter(ne("status", "FINISHED")); break;
-            }
-            for(int i = -1; i < (amount / 45); i++){  // make enough pages
-                OutlinePane pane = new OutlinePane(0, 0, 9, 5);
-                docs.skip((i+1) * 45).limit(45).forEach((Consumer<Document>) document -> {
-                    Ticket ticket = new Gson().fromJson(document.toJson(), Ticket.class);
-                    ItemStack item = new ItemStack(ticket.category().mat);
-                    ItemMeta meta = item.getItemMeta();
-                    if(ticket.status().equals(Status.HIGH_PRIORITY)){    //make a new item and if its high priority add enchants
-                        meta.displayName(Component.text(ticket + " (High Priority)").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
-                        meta.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
-                        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-                    }else {
-                        meta.displayName(Component.text(ticket.toString()).color(NamedTextColor.GOLD));
-                    }
+            gui.setOnGlobalClick(event -> event.setCancelled(true));
 
-                    List<Component> list = new ArrayList<>();
-                    list.add(Component.text(ticket.description()).color(NamedTextColor.WHITE));
-                    list.add(Component.empty());
-                    list.add(Component.text("Category: " + ticket.category().toString()).color(NamedTextColor.GRAY));
-                    list.add(Component.text(s.format(ticket.DateCreated()) + " " + ticket.playerName()).color(NamedTextColor.GRAY));
-                    meta.lore(list);
-                    item.setItemMeta(meta);
-                    GuiItem guiItem  = new GuiItem(item);
-                    guiItem.setAction(event -> {
-                         if(event.isShiftClick() && event.isRightClick()){ //if shift right click remove ticket and reset window while keeping same page
-                            MongodbServer.removeTicketAsync(ticket);
-                            p.sendMessage(Component.text("Removed ticket: " + ticket.name()).color(NamedTextColor.RED));
-                            int page = paginatedPane.getPage();
-                            openTicketWindow(p, SortType.NORMAL);
-                                try{
-                                    if(paginatedPane.getPages() > 0) {
+
+            MongodbServer.findTicketsAsync(docs -> {                //gets all documents in database, translates them into items, and puts into lists of 45 per page.
+                SimpleDateFormat s = new SimpleDateFormat("MM-dd-yyyy");
+                int amount = 0;
+                FindIterable<Document> doc;
+                try {
+                    amount = docs.sort(Sorts.descending("id")).first().getInteger("id");
+                } catch (NullPointerException ignored) {
+
+                }
+                switch (sort) {
+                    case TIME_LATEST ->  doc = docs.sort(Sorts.descending("_id")).filter(ne("status", "FINISHED"));
+                    case TIME_OLDEST -> doc = docs.sort(Sorts.ascending("_id")).filter(ne("status", "FINISHED"));
+                    case PRIORITY -> doc = docs.filter(new Document("status", "HIGH_PRIORITY"));
+                    case FINISHED -> doc = docs.filter(new Document("status", "FINISHED")).sort(Sorts.ascending("id"));
+                    default -> doc = docs.sort(Sorts.ascending("id")).filter(ne("status", "FINISHED"));
+                }
+                for (int i = 0; i < (amount / 45) + 1; i++) {  // make enough pages
+                    OutlinePane pane = new OutlinePane(0, 0, 9, 5);
+                    doc.skip((i) * 45).limit(45).forEach((Consumer<Document>) document -> {
+                        Ticket ticket = new Gson().fromJson(document.toJson(), Ticket.class);
+                        ItemStack item = new ItemStack(ticket.category().mat);
+                        ItemMeta meta = item.getItemMeta();
+                        if (ticket.status().equals(Status.HIGH_PRIORITY)) {    //make a new item and if its high priority add enchants
+                            meta.displayName(Component.text(ticket + " (High Priority)").color(NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
+                            meta.addEnchant(Enchantment.ARROW_INFINITE, 1, true);
+                            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                        } else {
+                            meta.displayName(Component.text(ticket.toString()).color(NamedTextColor.GOLD));
+                        }
+
+                        List<Component> list = new ArrayList<>();
+                        list.add(Component.text(ticket.description()).color(NamedTextColor.WHITE));
+                        list.add(Component.empty());
+                        list.add(Component.text("Category: " + ticket.category().toString()).color(NamedTextColor.GRAY));
+                        list.add(Component.text(s.format(ticket.DateCreated()) + " " + ticket.playerName()).color(NamedTextColor.GRAY));
+                        meta.lore(list);
+                        item.setItemMeta(meta);
+                        GuiItem guiItem = new GuiItem(item);
+                        guiItem.setAction(event -> {
+                            if (event.isShiftClick() && event.isRightClick()) { //if shift right click remove ticket and reset window while keeping same page
+                                MongodbServer.removeTicketAsync(ticket);
+                                p.sendMessage(Component.text("Removed ticket: " + ticket.name()).color(NamedTextColor.RED));
+                                int page = paginatedPane.getPage();
+                                openTicketWindow(p, SortType.NORMAL);
+                                try {
+                                    if (paginatedPane.getPages() > 0) {
                                         paginatedPane.setPage(page);
-                                        }
-                                        gui.update();
-                                    } catch (ArrayIndexOutOfBoundsException ignored) {}
-                        } else if (event.isRightClick() && !sort.equals(SortType.FINISHED)){
-                            if(ticket.status() != Status.HIGH_PRIORITY) {
-                                ticket.setStatus(Status.HIGH_PRIORITY);
-                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as High Priorty").color(NamedTextColor.GOLD));
-                            } else {
-                                ticket.setStatus(Status.NORMAL);
-                                p.sendMessage(Component.text("Ticket " + ticket.name() + " set as Normal Priorty").color(NamedTextColor.GOLD));
-                            }
-                            MongodbServer.saveTicketAsync(ticket);
-                            int page = paginatedPane.getPage();
-                            openTicketWindow(p, SortType.NORMAL);
-                            try{
-                                if(paginatedPane.getPages() > 0) {
-                                    paginatedPane.setPage(page);
+                                    }
+                                    gui.update();
+                                } catch (ArrayIndexOutOfBoundsException ignored) {
+                                }
+                            } else if (event.isRightClick() && !sort.equals(SortType.FINISHED)) {
+                                if (ticket.status() != Status.HIGH_PRIORITY) {
+                                    ticket.setStatus(Status.HIGH_PRIORITY);
+                                    p.sendMessage(Component.text("Ticket " + ticket.name() + " set as High Priorty").color(NamedTextColor.GOLD));
+                                } else {
+                                    ticket.setStatus(Status.NORMAL);
+                                    p.sendMessage(Component.text("Ticket " + ticket.name() + " set as Normal Priorty").color(NamedTextColor.GOLD));
+                                }
+                                MongodbServer.saveTicketAsync(ticket);
+                                int page = paginatedPane.getPage();
+                                openTicketWindow(p, SortType.NORMAL);
+                                try {
+                                    if (paginatedPane.getPages() > 0) {
+                                        paginatedPane.setPage(page);
+                                    }
+                                    gui.update();
+                                } catch (ArrayIndexOutOfBoundsException ignored) {
                                 }
                                 gui.update();
-                            } catch (ArrayIndexOutOfBoundsException ignored) {}
-                            gui.update();
-                        } else if(event.isShiftClick() && event.isLeftClick()){
-                             if(ticket.status() != Status.FINISHED) {
-                                 ticket.setStatus(Status.FINISHED);
-                             } else {
-                                 ticket.setStatus(Status.NORMAL);
-                             }
-                             MongodbServer.saveTicketAsync(ticket);
-                             Bukkit.getServer().broadcast(Component.text(p.getName() + " Finished ticket: " + ticket.name()).color(TextColor.color(95, 199, 121)));
-                             int page = paginatedPane.getPage();
-                             openTicketWindow(p, SortType.NORMAL);
-                             try{
-                                 if(paginatedPane.getPages() > 0) {
-                                     paginatedPane.setPage(page);
-                                 }
-                                 gui.update();
-                             } catch (ArrayIndexOutOfBoundsException ignored) {}
-                         }
+                            } else if (event.isShiftClick() && event.isLeftClick()) {
+                                if (ticket.status() != Status.FINISHED) {
+                                    ticket.setStatus(Status.FINISHED);
+                                } else {
+                                    ticket.setStatus(Status.NORMAL);
+                                }
+                                MongodbServer.saveTicketAsync(ticket);
+                                Bukkit.getServer().broadcast(Component.text(p.getName() + " Finished ticket: " + ticket.name()).color(TextColor.color(95, 199, 121)));
+                                int page = paginatedPane.getPage();
+                                openTicketWindow(p, SortType.NORMAL);
+                                try {
+                                    if (paginatedPane.getPages() > 0) {
+                                        paginatedPane.setPage(page);
+                                    }
+                                    gui.update();
+                                } catch (ArrayIndexOutOfBoundsException ignored) {
+                                }
+                            }
                         });
                         pane.addItem(guiItem);
                     });
-                paginatedPane.addPane(i+2, pane);
-            }
-            gui.addPane(paginatedPane);
-            if(sort.equals(SortType.FINISHED)) {
-                paginatedPane.setPage(1);
-                gui.setTitle("Finished Tickets");
-                gui.addPane(getBottemPane(gui, p, true));
-            }else {
-                paginatedPane.setPage(1);
-                gui.addPane(patternPane);
-            }
-            gui.show(p);
-        });
+                    paginatedPane.addPane(i + 1, pane);
+                }
+                gui.addPane(paginatedPane);
+                if (sort.equals(SortType.FINISHED)) {
+                    paginatedPane.setPage(1);
+                    gui.setTitle("Finished Tickets");
+                    gui.addPane(getBottemPane(gui, p, true));
+                } else {
+                    paginatedPane.setPage(1);
+                    gui.addPane(patternPane);
+                }
+                gui.show(p);
+            });
+        }, 10);
     }
 
     public static void chooseCategory(Player p, String name, String description){ // makes a gui that displays options to choose a category and then
@@ -187,9 +196,20 @@ public class GUIManager {
         );
         PatternPane pane = new PatternPane(0, 0, 9, 3, pattern);
         GuiItem building = generateItem("Building", Category.BUILDING.mat);
-        GuiItem lore = generateItem("Lore", Category.LORE.mat);
-        GuiItem playTesting = generateItem("Play Testing", Category.PLAY_TESTING.mat);
+        GuiItem lore = generateItem("Plugin Config", Category.LORE.mat);
+        GuiItem playTesting = generateItem("Idea", Category.PLAY_TESTING.mat);
         GuiItem technical = generateItem("nerd stuff", Category.TECHNICAL.mat);
+
+        for(Category cat: Category.values()){
+            GuiItem cate = generateItem(cat.name, cat.mat);
+            cate.setAction(event -> {
+                MongodbServer.saveTicketAsync(new Ticket(p.getName(), Category.BUILDING, name, description));
+                p.sendMessage(Component.text("Ticket " + name + " Saved").color(TextColor.color(95, 199, 121)));
+                openTicketWindow(p, SortType.NORMAL);
+            });
+
+        }
+
 
         //TODO give category a type for name
 
@@ -224,8 +244,7 @@ public class GUIManager {
 
         gui.addPane(pane);
         gui.show(p);
-    }
-
+        }
 
     public static PatternPane getBottemPane(Gui gui, Player p, boolean finished) {
         Pattern pattern;

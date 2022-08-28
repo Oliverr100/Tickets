@@ -1,6 +1,6 @@
 name: Tickets
 version: '${project.version}'
 main: me.bananababoo.tickets.Tickets
-api-version: 1.18
+api-version: 1.19
 authors: [ Bananababoo ]
 description: Tickets Plugin for Serenia
