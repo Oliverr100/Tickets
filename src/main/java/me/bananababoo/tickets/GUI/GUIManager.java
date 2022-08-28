@@ -28,9 +28,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.util.ChatPaginator;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -97,7 +99,7 @@ public class GUIManager {
                 }
                 for (int i = 0; i < (amount / 45) + 1; i++) {  // make enough pages
                     OutlinePane pane = new OutlinePane(0, 0, 9, 5);
-                    doc.skip((i) * 45).limit(45).forEach((Consumer<Document>) document -> {
+                    doc.skip((i) * 45).limit(45).forEach(document -> {
                         Ticket ticket = new Gson().fromJson(document.toJson(), Ticket.class);
                         ItemStack item = new ItemStack(ticket.category().mat);
                         ItemMeta meta = item.getItemMeta();
@@ -110,8 +112,9 @@ public class GUIManager {
                         }
 
                         List<Component> list = new ArrayList<>();
+                        Arrays.stream(ChatPaginator.wordWrap(ticket.description(), 4)).toList()  //auto word wrapping
+                                .forEach(s1 -> list.add(Component.text(s1).color(NamedTextColor.GRAY)));
                         list.add(Component.text(ticket.description()).color(NamedTextColor.WHITE));
-                        list.add(Component.empty());
                         list.add(Component.text("Category: " + ticket.category().toString()).color(NamedTextColor.GRAY));
                         list.add(Component.text(s.format(ticket.DateCreated()) + " " + ticket.playerName()).color(NamedTextColor.GRAY));
                         meta.lore(list);
